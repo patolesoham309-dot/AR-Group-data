@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="mr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AR Group Diesel Fleet Management</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#172033;background:#f3f6fb}
+*{box-sizing:border-box}body{margin:0}.top{background:#14213d;color:white;padding:18px 22px}
+.wrap{max-width:1200px;margin:22px auto;padding:0 14px}
+.card{background:white;border:1px solid #e3e9f2;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 4px 16px #15213a0a}
+h1{font-size:21px;margin:0 0 6px}h2{font-size:18px;margin:0 0 14px}
+h3{font-size:15px;margin:0 0 10px}.muted{color:#64748b;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.stat{background:#edf3ff;border:1px solid #dbe6fa;padding:15px;border-radius:10px}
+.stat strong{display:block;font-size:22px;margin-top:7px}
+label{display:block;font-size:13px;font-weight:600;margin:10px 0 5px}
+input,select,button{font:inherit;width:100%;padding:11px;border:1px solid #ccd5e2;border-radius:8px;background:white}
+button{background:#2457d6;color:white;border:0;font-weight:700;cursor:pointer;margin-top:12px}
+button.secondary{background:#e8eefc;color:#2147a5}button.danger{background:#b42318}
+button.success{background:#16834a}.hidden{display:none!important}
+.status{padding:10px;border-radius:8px;background:#eff6ff;margin-top:10px;white-space:pre-wrap}
+.tablewrap{overflow-x:auto;margin-top:10px}table{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}
+td,th{padding:10px;border-bottom:1px solid #e7edf5;text-align:left;vertical-align:top}
+th{background:#edf2f8}.badge{padding:5px 8px;border-radius:6px;font-size:12px;background:#fff2cc}
+.badge.approved{background:#dcfce7;color:#166534}.badge.rejected{background:#fee2e2;color:#991b1b}
+a{color:#2457d6}.actions{display:flex;gap:6px;min-width:150px}.actions button{margin:0;padding:8px}
+.section-title{margin-top:20px}
+@media(max-width:600px){.top{padding:15px}.card{padding:14px}}
+</style>
+</head>
+<body>
+<div class="top">
+<h1>🚌 AR GROUP – Diesel Fleet Management</h1>
+<div class="muted" style="color:#cbd5e1">Driver Entry · Office Approval · Fleet Reports</div>
+</div>
+
+<div class="wrap">
+<div class="card" id="loginCard">
+<h2>Login</h2>
+<form id="loginForm">
+<label>Username</label><input name="username" autocomplete="username" required>
+<label>Password</label><input name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Login</button>
+</form>
+<div id="loginMsg" class="status hidden"></div>
+<div class="muted" style="margin-top:10px">Developed By Er. Soham Patole</div>
+</div>
+
+<div id="app" class="hidden">
+<div class="card">
+<div class="grid">
+<div><b id="welcome"></b><div class="muted" id="role"></div></div>
+<div><button class="secondary" id="logout">Logout</button></div>
+</div>
+</div>
+
+<!-- DRIVER -->
+<div class="card hidden" id="driverPanel">
+<h2>Diesel Filling Entry</h2>
+<form id="entryForm" enctype="multipart/form-data">
+<div class="grid">
+<div><label>Date</label><input type="date" name="entry_date" id="entryDate" required></div>
+<div><label>Bus</label><select name="bus_id" id="busSelect" required></select></div>
+<div><label>Route</label><select name="route_id" id="routeSelect" required></select></div>
+<div><label>Meter Reading (KM)</label><input type="number" name="meter_km" min="1" step="0.1" required></div>
+<div><label>Diesel Quantity (Litres)</label><input type="number" name="litres" min="0.1" step="0.01" required></div>
+<div><label>Diesel Rate (₹/Litre)</label><input type="number" name="rate_per_litre" min="0.1" step="0.01" required></div>
+<div><label>Tank भरला का?</label>
+<select name="full_tank"><option value="true">होय – Full tank</option><option value="false">नाही – Partial</option></select></div>
+<div><label>Meter / Odometer Photo (Required)</label>
+<input type="file" name="meter_photo" accept="image/jpeg,image/png,image/webp" capture="environment" required></div>
+<div><label>Pump / Diesel Bill Photo (Required)</label>
+<input type="file" name="pump_photo" accept="image/jpeg,image/png,image/webp" capture="environment" required></div>
+</div>
+<button type="submit">Submit for Office Approval</button>
+</form>
+<div id="entryMsg" class="status hidden"></div>
+<p class="muted">दोन्ही फोटो स्पष्ट असावेत. Entry submit झाल्यावर Pending राहील.</p>
+</div>
+
+<div class="card hidden" id="myEntriesPanel">
+<h2>My Diesel Entries</h2>
+<button class="secondary" id="myEntriesRefresh">Refresh My Entries</button>
+<div id="myEntries" class="tablewrap"></div>
+</div>
+
+<!-- OFFICE -->
+<div id="officePanel" class="hidden">
+<div class="card">
+<h2>Office Dashboard</h2>
+<button class="secondary" id="refresh">Refresh Dashboard</button>
+</div>
+
+<div class="card">
+<h2>Fleet Summary – All Time</h2>
+<div id="summary" class="stats"></div>
+</div>
+
+<div class="card">
+<h2>Bus-wise Approved Report</h2>
+<div id="busSummary" class="tablewrap"></div>
+</div>
+
+<div class="card">
+<h2>Route-wise Approved Report</h2>
+<div id="routeSummary" class="tablewrap"></div>
+</div>
+
+<div class="card">
+<h2>Monthly / Yearly Report</h2>
+<div class="grid">
+<div><label>Year</label><input type="number" id="reportYear" min="2020" max="2100"></div>
+<div><label>Month (blank = full year)</label>
+<select id="reportMonth">
+<option value="">Full Year</option>
+<option value="1">January</option><option value="2">February</option>
+<option value="3">March</option><option value="4">April</option>
+<option value="5">May</option><option value="6">June</option>
+<option value="7">July</option><option value="8">August</option>
+<option value="9">September</option><option value="10">October</option>
+<option value="11">November</option><option value="12">December</option>
+</select></div>
+</div>
+<button id="runReport">Generate Report</button>
+<div id="periodReport"></div>
+</div>
+
+<div class="card">
+<h2>Diesel Entries / Office Approval</h2>
+<label>Filter Status</label>
+<select id="statusFilter">
+<option value="">All Entries</option>
+<option value="pending">Pending</option>
+<option value="approved">Approved</option>
+<option value="rejected">Rejected</option>
+</select>
+<div id="entries" class="tablewrap"></div>
+</div>
+</div>
+
+<!-- SUPER ADMIN ONLY -->
+<div class="hidden" id="superAdminPanel">
+<div class="card">
+<h2>Create Driver / Office Staff Login</h2>
+<form id="userForm">
+<div class="grid">
+<div><label>Username</label><input name="username" required></div>
+<div><label>Full Name</label><input name="full_name" required></div>
+<div><label>Temporary Password (10+ characters)</label><input name="password" type="password" minlength="10" required></div>
+<div><label>Role</label><select name="role"><option value="driver">Driver</option><option value="staff">Office Staff</option></select></div>
+<div><label>Fixed Bus (Rotation असल्यास blank ठेवा)</label><select name="fixed_bus_id" id="fixedBus"><option value="">Rotation / Not fixed</option></select></div>
+</div>
+<button type="submit">Create Account</button>
+</form>
+<div id="userMsg" class="status hidden"></div>
+</div>
+
+<div class="card">
+<h2>User Management</h2>
+<button class="secondary" id="refreshUsers">Refresh Users</button>
+<div id="usersTable" class="tablewrap"></div>
+</div>
+
+<div class="card">
+<h2>Add New Bus</h2>
+<form id="busForm"><label>Bus Number</label><input name="bus_number" placeholder="BUS-31" required><button>Add Bus</button></form>
+<div id="busMsg" class="status hidden"></div>
+</div>
+
+<div class="card">
+<h2>Add New Route</h2>
+<form id="routeForm"><label>Route Name</label><input name="route_name" placeholder="Pune-Goa" required><button>Add Route</button></form>
+<div id="routeMsg" class="status hidden"></div>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+let token = sessionStorage.getItem("fleet_token") || "";
+let me = null;
+let buses = [];
+let routes = [];
+
+const $ = id => document.getElementById(id);
+
+const api = async (url, options = {}) => {
+    options.headers = {...(options.headers || {})};
+    if (token) options.headers.Authorization = "Bearer " + token;
+    const response = await fetch(url, options);
+    let data = {};
+    try { data = await response.json(); } catch (e) {}
+    if (!response.ok) throw new Error(data.detail || "Request failed");
+    return data;
+};
+
+function show(id, on = true) {
+    $(id).classList.toggle("hidden", !on);
+}
+function msg(id, value) {
+    $(id).textContent = value;
+    show(id, true);
+}
+function esc(value) {
+    return String(value ?? "").replace(/[&<>"']/g, ch => ({
+        "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+    })[ch]);
+}
+function fmtNum(value) {
+    return Number(value || 0).toLocaleString("en-IN", {maximumFractionDigits:2});
+}
+function fmtMoney(value) {
+    return "₹" + Number(value || 0).toLocaleString("en-IN", {maximumFractionDigits:2});
+}
+function table(headers, rows) {
+    let html = "<table><thead><tr>";
+    headers.forEach(h => html += "<th>" + esc(h) + "</th>");
+    html += "</tr></thead><tbody>";
+    if (!rows.length) html += '<tr><td colspan="' + headers.length + '">No records found</td></tr>';
+    rows.forEach(row => {
+        html += "<tr>";
+        row.forEach(cell => html += "<td>" + (cell ?? "") + "</td>");
+        html += "</tr>";
+    });
+    return html + "</tbody></table>";
+}
+
+async function loadMasterData() {
+    buses = await api("/api/buses");
+    routes = await api("/api/routes");
+
+    const busSelect = $("busSelect");
+    const fixedBus = $("fixedBus");
+    busSelect.innerHTML = '<option value="">Select Bus</option>';
+    fixedBus.innerHTML = '<option value="">Rotation / Not fixed</option>';
+
+    buses.forEach(b => {
+        busSelect.add(new Option(b.bus_number, b.id));
+        fixedBus.add(new Option(b.bus_number, b.id));
+    });
+
+    const routeSelect = $("routeSelect");
+    routeSelect.innerHTML = '<option value="">Select Route</option>';
+    routes.forEach(r => routeSelect.add(new Option(r.route_name, r.id)));
+
+    if (me && me.fixed_bus_id) {
+        busSelect.value = me.fixed_bus_id;
+        busSelect.disabled = true;
+    } else {
+        busSelect.disabled = false;
+    }
+}
+
+function renderRole() {
+    show("loginCard", false);
+    show("app", true);
+    show("driverPanel", me.role === "driver");
+    show("myEntriesPanel", me.role === "driver");
+    show("officePanel", me.role === "staff" || me.role === "super_admin");
+    show("superAdminPanel", me.role === "super_admin");
+    $("welcome").textContent = "नमस्कार, " + me.full_name;
+    $("role").textContent = "Role: " + me.role;
+}
+
+async function doLogin(form) {
+    const response = await fetch("/api/login", {method:"POST", body:form});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Login failed");
+    token = data.access_token;
+    sessionStorage.setItem("fleet_token", token);
+    me = await api("/api/me");
+    await loadMasterData();
+    renderRole();
+    if (me.role !== "driver") {
+        await loadOffice();
+    } else {
+        $("entryDate").value = new Date().toISOString().slice(0,10);
+        await loadMyEntries();
+    }
+}
+
+$("loginForm").onsubmit = async e => {
+    e.preventDefault();
+    msg("loginMsg", "Logging in...");
+    try {
+        await doLogin(new FormData(e.target));
+        show("loginMsg", false);
+    } catch (error) {
+        msg("loginMsg", error.message);
+    }
+};
+
+async function loadOffice() {
+    await loadAdminEntries();
+    await loadSummary();
+    if (me.role === "super_admin") await loadUsers();
+}
+
+async function loadAdminEntries() {
+    const status = $("statusFilter").value;
+    const url = "/api/admin/entries" + (status ? "?status=" + encodeURIComponent(status) : "");
+    const entries = await api(url);
+
+    const rows = entries.map(e => {
+        const meter = "/uploads/" + encodeURIComponent(e.meter_photo) + "?token=" + encodeURIComponent(token);
+        const pump = "/uploads/" + encodeURIComponent(e.pump_photo) + "?token=" + encodeURIComponent(token);
+        let badge = '<span class="badge">' + esc(e.status) + '</span>';
+        if (e.status === "approved") badge = '<span class="badge approved">Approved</span>';
+        if (e.status === "rejected") badge = '<span class="badge rejected">Rejected</span>';
+        let action = "";
+        if (e.status === "pending") {
+            action = '<div class="actions">' +
+                '<button class="success" onclick="reviewEntry(' + Number(e.id) + ',\'approved\')">Approve</button>' +
+                '<button class="danger" onclick="reviewEntry(' + Number(e.id) + ',\'rejected\')">Reject</button>' +
+                '</div>';
+        }
+        return [
+            esc(e.entry_date), esc(e.bus_number), esc(e.route_name), esc(e.driver_name),
+            esc(e.meter_km), esc(e.litres),
+            '<a target="_blank" rel="noopener" href="' + meter + '">Meter</a> · <a target="_blank" rel="noopener" href="' + pump + '">Pump</a>',
+            badge + action
+        ];
+    });
+    $("entries").innerHTML = table(["Date","Bus","Route","Driver","KM","Litres","Photos","Status / Action"], rows);
+}
+
+async function loadSummary() {
+    const s = await api("/api/admin/summary");
+    let litres = 0, cost = 0, count = 0;
+    (s.status_totals || []).forEach(x => {
+        litres += Number(x.litres || 0);
+        cost += Number(x.cost || 0);
+        count += Number(x.n || 0);
+    });
+    const getCount = status => {
+        const row = (s.status_totals || []).find(x => x.status === status);
+        return Number(row?.n || 0);
+    };
+    $("summary").innerHTML =
+        '<div class="stat">Total Entries<strong>' + count + '</strong></div>' +
+        '<div class="stat">All Status Diesel<strong>' + fmtNum(litres) + ' L</strong></div>' +
+        '<div class="stat">All Status Cost<strong>' + fmtMoney(cost) + '</strong></div>' +
+        '<div class="stat">Pending<strong>' + getCount("pending") + '</strong></div>' +
+        '<div class="stat">Approved<strong>' + getCount("approved") + '</strong></div>' +
+        '<div class="stat">Rejected<strong>' + getCount("rejected") + '</strong></div>';
+
+    $("busSummary").innerHTML = table(
+        ["Bus","Approved Entries","Approved Litres","Approved Expense"],
+        (s.bus_totals || []).map(x => [esc(x.bus_number), Number(x.entries || 0), fmtNum(x.litres), fmtMoney(x.cost)])
+    );
+    $("routeSummary").innerHTML = table(
+        ["Route","Approved Entries","Approved Litres","Approved Expense"],
+        (s.route_totals || []).map(x => [esc(x.route_name), Number(x.entries || 0), fmtNum(x.litres), fmtMoney(x.cost)])
+    );
+}
+
+window.reviewEntry = async (id, decision) => {
+    const f = new FormData();
+    f.append("decision", decision);
+    f.append("note", "");
+    try {
+        await api("/api/admin/entries/" + id + "/review", {method:"POST", body:f});
+        await loadOffice();
+    } catch (error) { alert(error.message); }
+};
+
+$("refresh").onclick = async () => {
+    try { await loadOffice(); } catch (error) { alert(error.message); }
+};
+$("statusFilter").onchange = async () => {
+    try { await loadAdminEntries(); } catch (error) { alert(error.message); }
+};
+
+$("entryForm").onsubmit = async e => {
+    e.preventDefault();
+    try {
+        await api("/api/diesel-entries", {method:"POST", body:new FormData(e.target)});
+        msg("entryMsg", "Entry submitted successfully. Status: Pending approval.");
+        e.target.reset();
+        $("entryDate").value = new Date().toISOString().slice(0,10);
+        if (me.fixed_bus_id) {
+            $("busSelect").value = me.fixed_bus_id;
+            $("busSelect").disabled = true;
+        }
+        await loadMyEntries();
+    } catch (error) { msg("entryMsg", error.message); }
+};
+
+async function loadMyEntries() {
+    const data = await api("/api/driver/entries");
+    $("myEntries").innerHTML = table(
+        ["Date","Bus","Route","KM","Litres","Rate","Status","Office Note"],
+        data.map(x => [
+            esc(x.entry_date), esc(x.bus_number), esc(x.route_name), esc(x.meter_km),
+            esc(x.litres), fmtMoney(x.rate_per_litre),
+            esc(x.status), esc(x.review_note || "")
+        ])
+    );
+}
+$("myEntriesRefresh").onclick = async () => {
+    try { await loadMyEntries(); } catch (error) { alert(error.message); }
+};
+
+$("userForm").onsubmit = async e => {
+    e.preventDefault();
+    try {
+        await api("/api/admin/users", {method:"POST", body:new FormData(e.target)});
+        msg("userMsg", "Account created successfully.");
+        e.target.reset();
+        await loadUsers();
+    } catch (error) { msg("userMsg", error.message); }
+};
+
+async function loadUsers() {
+    const users = await api("/api/admin/users");
+    const rows = users.map(u => {
+        const state = u.active ? "Active" : "Inactive";
+        const action = u.active
+            ? '<button class="danger" onclick="toggleUser(' + Number(u.id) + ',false)">Deactivate</button>'
+            : '<button class="success" onclick="toggleUser(' + Number(u.id) + ',true)">Activate</button>';
+        return [
+            Number(u.id), esc(u.username), esc(u.full_name), esc(u.role),
+            esc(u.bus_number || "Rotation / Not fixed"), state, action
+        ];
+    });
+    $("usersTable").innerHTML = table(
+        ["ID","Username","Full Name","Role","Bus Assignment","Status","Action"], rows
+    );
+}
+window.toggleUser = async (id, active) => {
+    const f = new FormData();
+    f.append("active", String(active));
+    try {
+        await api("/api/admin/users/" + id + "/active", {method:"POST", body:f});
+        await loadUsers();
+    } catch (error) { alert(error.message); }
+};
+$("refreshUsers").onclick = loadUsers;
+
+$("busForm").onsubmit = async e => {
+    e.preventDefault();
+    try {
+        await api("/api/admin/buses", {method:"POST", body:new FormData(e.target)});
+        msg("busMsg", "Bus added successfully.");
+        e.target.reset();
+        await loadMasterData();
+    } catch (error) { msg("busMsg", error.message); }
+};
+$("routeForm").onsubmit = async e => {
+    e.preventDefault();
+    try {
+        await api("/api/admin/routes", {method:"POST", body:new FormData(e.target)});
+        msg("routeMsg", "Route added successfully.");
+        e.target.reset();
+        await loadMasterData();
+    } catch (error) { msg("routeMsg", error.message); }
+};
+
+$("runReport").onclick = async () => {
+    try {
+        const year = $("reportYear").value;
+        const month = $("reportMonth").value;
+        let url = "/api/admin/reports/period?year=" + encodeURIComponent(year);
+        if (month) url += "&month=" + encodeURIComponent(month);
+        const report = await api(url);
+        const totals = report.status_totals || [];
+        const rows = totals.map(x => [
+            esc(x.status), Number(x.entries || 0), fmtNum(x.litres), fmtMoney(x.cost)
+        ]);
+        $("periodReport").innerHTML =
+            '<h3 class="section-title">Status Totals</h3>' +
+            table(["Status","Entries","Litres","Expense"], rows) +
+            '<h3 class="section-title">Bus-wise Approved Report</h3>' +
+            table(["Bus","Entries","Litres","Expense"],
+                (report.bus_totals || []).map(x => [esc(x.bus_number), Number(x.entries || 0), fmtNum(x.litres), fmtMoney(x.cost)])) +
+            '<h3 class="section-title">Route-wise Approved Report</h3>' +
+            table(["Route","Entries","Litres","Expense"],
+                (report.route_totals || []).map(x => [esc(x.route_name), Number(x.entries || 0), fmtNum(x.litres), fmtMoney(x.cost)]));
+    } catch (error) {
+        $("periodReport").textContent = error.message;
+    }
+};
+
+$("logout").onclick = () => {
+    token = "";
+    me = null;
+    sessionStorage.removeItem("fleet_token");
+    location.reload();
+};
+
+async function restoreSession() {
+    if (!token) return;
+    try {
+        me = await api("/api/me");
+        await loadMasterData();
+        renderRole();
+        if (me.role === "driver") {
+            $("entryDate").value = new Date().toISOString().slice(0,10);
+            await loadMyEntries();
+        } else {
+            await loadOffice();
+        }
+    } catch (error) {
+        token = "";
+        sessionStorage.removeItem("fleet_token");
+        show("loginCard", true);
+        show("app", false);
+    }
+}
+
+const now = new Date();
+$("reportYear").value = now.getFullYear();
+restoreSession();
+</script>
+</body>
+</html>
